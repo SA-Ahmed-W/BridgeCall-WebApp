@@ -26,7 +26,7 @@ function App() {
 
   return (
     <div>
-      <h2>Test Collection</h2>
+      <h2 className='underline'>Test Collection</h2>
       <ul>
         {docs.map(doc => (
           <li key={doc.id}>
