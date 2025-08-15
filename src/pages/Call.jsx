@@ -1,9 +1,8 @@
-
-import React, { useEffect, useRef, useState } from 'react';
-import WebRTCService from '../webrtc/WebRTCService';
-import { firestore } from '../db/firestore';
-import { useAuth } from '../hooks/auth/useAuth';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from "react";
+import WebRTCService from "../webrtc/WebRTCService";
+import { firestore } from "../db/firestore";
+import { useAuth } from "../hooks/auth/useAuth";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function Call() {
   const { callId } = useParams();
@@ -13,7 +12,7 @@ export default function Call() {
   const remoteVideoRef = useRef(null);
   const [callData, setCallData] = useState(null);
   const [webrtc] = useState(() => new WebRTCService());
-  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -21,12 +20,12 @@ export default function Call() {
   // Listen for call doc changes
   useEffect(() => {
     if (!callId) return;
-    console.log('🔄 Setting up call listener for:', callId);
-    
+    console.log("🔄 Setting up call listener for:", callId);
+
     const unsubscribe = firestore.listenToCall(callId, (data) => {
-      console.log('📞 Call data updated:', data);
+      console.log("📞 Call data updated:", data);
       setCallData(data);
-      if (data?.status === 'ended') {
+      if (data?.status === "ended") {
         endCall();
       }
     });
@@ -36,136 +35,154 @@ export default function Call() {
   // WebRTC setup and signaling with proper sequencing
   useEffect(() => {
     if (!callData || !user) {
-      console.log('⏳ Waiting for callData and user...', { callData: !!callData, user: !!user });
+      console.log("⏳ Waiting for callData and user...", {
+        callData: !!callData,
+        user: !!user,
+      });
       return;
     }
     if (error) {
-      console.log('❌ Skipping due to error:', error);
+      console.log("❌ Skipping due to error:", error);
       return;
     }
     if (isInitialized) {
-      console.log('✅ Already initialized, skipping...');
+      console.log("✅ Already initialized, skipping...");
       return;
     }
 
-    console.log('🚀 Starting WebRTC setup...');
-    console.log('👤 User role:', user.uid === callData.callerId ? 'CALLER' : 'CALLEE');
-    console.log('📋 Call data:', callData);
+    console.log("🚀 Starting WebRTC setup...");
+    console.log(
+      "👤 User role:",
+      user.uid === callData.callerId ? "CALLER" : "CALLEE"
+    );
+    console.log("📋 Call data:", callData);
 
     const startWebRTC = async () => {
       try {
-        setConnectionStatus('Requesting camera/microphone access...');
-        console.log('🎥 Initializing WebRTC...');
-        
+        setConnectionStatus("Requesting camera/microphone access...");
+        console.log("🎥 Initializing WebRTC...");
+
         // Initialize WebRTC
         await webrtc.init(localVideoRef.current, remoteVideoRef.current, {
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
 
         setIsInitialized(true);
-        console.log('✅ WebRTC initialized successfully');
-        setConnectionStatus('Setting up connection...');
+        console.log("✅ WebRTC initialized successfully");
+        setConnectionStatus("Setting up connection...");
 
         // Handle ICE candidates
         webrtc.onIceCandidate = async (candidateObject) => {
-          const field = user.uid === callData.callerId ? "offerCandidates" : "answerCandidates";
+          const field =
+            user.uid === callData.callerId
+              ? "offerCandidates"
+              : "answerCandidates";
           const currentCandidates = callData[field] || [];
           console.log(`🧊 Adding ICE candidate to ${field}:`, candidateObject);
-          
+
           await firestore.updateCall(callId, {
-            [field]: [...currentCandidates, candidateObject]
+            [field]: [...currentCandidates, candidateObject],
           });
         };
 
         // CALLER FLOW
         if (user.uid === callData.callerId) {
-          console.log('📤 CALLER: Starting caller flow...');
-          setConnectionStatus('Creating offer...');
-          
+          console.log("📤 CALLER: Starting caller flow...");
+          setConnectionStatus("Creating offer...");
+
           // Create offer if not exists
           if (!callData.offer) {
-            console.log('📝 CALLER: Creating offer...');
+            console.log("📝 CALLER: Creating offer...");
             const offer = await webrtc.createOffer();
-            console.log('📝 CALLER: Offer created:', offer);
-            
+            console.log("📝 CALLER: Offer created:", offer);
+
             await firestore.updateCall(callId, { offer });
-            console.log('💾 CALLER: Offer saved to Firestore');
-            setConnectionStatus('Waiting for answer...');
+            console.log("💾 CALLER: Offer saved to Firestore");
+            setConnectionStatus("Waiting for answer...");
           } else {
-            console.log('📝 CALLER: Offer already exists:', callData.offer);
+            console.log("📝 CALLER: Offer already exists:", callData.offer);
           }
-          
+
           // Handle answer when available
           if (callData.answer) {
-            console.log('📥 CALLER: Answer received, processing...');
-            setConnectionStatus('Processing answer...');
+            console.log("📥 CALLER: Answer received, processing...");
+            setConnectionStatus("Processing answer...");
             await webrtc.setRemoteDescription(callData.answer);
             setIsConnected(true);
-            setConnectionStatus('Connected');
-            
+            setConnectionStatus("Connected");
+
             // Add ICE candidates after remote description is set
             const answerCandidates = callData.answerCandidates || [];
-            console.log('🧊 CALLER: Adding answer candidates:', answerCandidates.length);
-            answerCandidates.forEach(candidate => {
+            console.log(
+              "🧊 CALLER: Adding answer candidates:",
+              answerCandidates.length
+            );
+            answerCandidates.forEach((candidate) => {
               webrtc.addIceCandidate(candidate);
             });
           } else {
-            console.log('⏳ CALLER: Waiting for answer...');
+            console.log("⏳ CALLER: Waiting for answer...");
           }
-        } 
+        }
         // CALLEE FLOW
         else if (user.uid === callData.calleeId) {
-          console.log('📥 CALLEE: Starting callee flow...');
-          
+          console.log("📥 CALLEE: Starting callee flow...");
+
           if (callData.offer && !callData.answer) {
-            console.log('📝 CALLEE: Offer received, processing...');
-            setConnectionStatus('Processing offer...');
-            
+            console.log("📝 CALLEE: Offer received, processing...");
+            setConnectionStatus("Processing offer...");
+
             // Set remote description first
             await webrtc.setRemoteDescription(callData.offer);
-            console.log('✅ CALLEE: Remote description set');
-            
+            console.log("✅ CALLEE: Remote description set");
+
             // Add offer candidates after remote description is set
             const offerCandidates = callData.offerCandidates || [];
-            console.log('🧊 CALLEE: Adding offer candidates:', offerCandidates.length);
-            offerCandidates.forEach(candidate => {
+            console.log(
+              "🧊 CALLEE: Adding offer candidates:",
+              offerCandidates.length
+            );
+            offerCandidates.forEach((candidate) => {
               webrtc.addIceCandidate(candidate);
             });
-            
+
             // Create and send answer
-            setConnectionStatus('Creating answer...');
-            console.log('📝 CALLEE: Creating answer...');
+            setConnectionStatus("Creating answer...");
+            console.log("📝 CALLEE: Creating answer...");
             const answer = await webrtc.createAnswer();
-            console.log('📝 CALLEE: Answer created:', answer);
-            
-            await firestore.updateCall(callId, { 
-              answer, 
-              status: 'connected' 
+            console.log("📝 CALLEE: Answer created:", answer);
+
+            await firestore.updateCall(callId, {
+              answer,
+              status: "connected",
             });
-            console.log('💾 CALLEE: Answer saved to Firestore');
-            
+            console.log("💾 CALLEE: Answer saved to Firestore");
+
             setIsConnected(true);
-            setConnectionStatus('Connected');
+            setConnectionStatus("Connected");
           } else {
-            console.log('⏳ CALLEE: Waiting for offer or answer already exists');
-            console.log('📋 CALLEE: offer exists:', !!callData.offer);
-            console.log('📋 CALLEE: answer exists:', !!callData.answer);
+            console.log(
+              "⏳ CALLEE: Waiting for offer or answer already exists"
+            );
+            console.log("📋 CALLEE: offer exists:", !!callData.offer);
+            console.log("📋 CALLEE: answer exists:", !!callData.answer);
           }
         }
-
       } catch (err) {
-        console.error('❌ WebRTC Error:', err);
-        
-        if (err.message.includes('permissions denied')) {
-          setError('Camera/microphone access denied. Please refresh and allow permissions.');
-        } else if (err.name === 'NotFoundError') {
-          setError('No camera or microphone found on your device.');
-        } else if (err.name === 'NotReadableError') {
-          setError('Camera/microphone is being used by another application.');
+        console.error("❌ WebRTC Error:", err);
+
+        if (err.message.includes("permissions denied")) {
+          setError(
+            "Camera/microphone access denied. Please refresh and allow permissions."
+          );
+        } else if (err.name === "NotFoundError") {
+          setError("No camera or microphone found on your device.");
+        } else if (err.name === "NotReadableError") {
+          setError("Camera/microphone is being used by another application.");
         } else {
-          setError('Failed to establish connection: ' + err.message);
+          setError("Failed to establish connection: " + err.message);
         }
-        setConnectionStatus('Connection failed');
+        setConnectionStatus("Connection failed");
       }
     };
 
@@ -176,25 +193,25 @@ export default function Call() {
   useEffect(() => {
     if (!callData || !isInitialized || !webrtc.peerConnection) return;
 
-    console.log('🔄 Processing call updates...');
+    console.log("🔄 Processing call updates...");
 
     // CALLER: Check for new answer
     if (user.uid === callData.callerId && callData.answer && !isConnected) {
-      console.log('📥 CALLER: New answer detected, processing...');
+      console.log("📥 CALLER: New answer detected, processing...");
       (async () => {
         try {
-          setConnectionStatus('Processing answer...');
+          setConnectionStatus("Processing answer...");
           await webrtc.setRemoteDescription(callData.answer);
           setIsConnected(true);
-          setConnectionStatus('Connected');
-          
+          setConnectionStatus("Connected");
+
           // Add answer candidates
           const answerCandidates = callData.answerCandidates || [];
-          answerCandidates.forEach(candidate => {
+          answerCandidates.forEach((candidate) => {
             webrtc.addIceCandidate(candidate);
           });
         } catch (err) {
-          console.error('❌ Error processing answer:', err);
+          console.error("❌ Error processing answer:", err);
         }
       })();
     }
@@ -204,25 +221,31 @@ export default function Call() {
       if (user.uid === callData.callerId) {
         // Caller processes answer candidates
         const answerCandidates = callData.answerCandidates || [];
-        answerCandidates.forEach(candidate => {
+        answerCandidates.forEach((candidate) => {
           webrtc.addIceCandidate(candidate);
         });
       } else if (user.uid === callData.calleeId) {
-        // Callee processes offer candidates  
+        // Callee processes offer candidates
         const offerCandidates = callData.offerCandidates || [];
-        offerCandidates.forEach(candidate => {
+        offerCandidates.forEach((candidate) => {
           webrtc.addIceCandidate(candidate);
         });
       }
     };
 
     handleNewCandidates();
-  }, [callData?.offer, callData?.answer, callData?.offerCandidates, callData?.answerCandidates, isInitialized]);
+  }, [
+    callData?.offer,
+    callData?.answer,
+    callData?.offerCandidates,
+    callData?.answerCandidates,
+    isInitialized,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('🧹 Cleaning up WebRTC...');
+      console.log("🧹 Cleaning up WebRTC...");
       webrtc.close();
     };
   }, []);
@@ -230,16 +253,16 @@ export default function Call() {
   // End call function
   const endCall = async () => {
     try {
-      console.log('📞 Ending call...');
+      console.log("📞 Ending call...");
       await webrtc.close();
-      if (callData && callData.status !== 'ended') {
-        await firestore.updateCall(callId, { status: 'ended' });
+      if (callData && callData.status !== "ended") {
+        await firestore.updateCall(callId, { status: "ended" });
       }
-      await firestore.updateUser(user.uid, { status: 'online' });
-      navigate('/');
+      await firestore.updateUser(user.uid, { status: "online" });
+      navigate("/");
     } catch (error) {
-      console.error('Error ending call:', error);
-      navigate('/');
+      console.error("Error ending call:", error);
+      navigate("/");
     }
   };
 
@@ -257,10 +280,11 @@ export default function Call() {
         <div className="text-center max-w-md mx-auto p-6">
           <div className="text-red-400 text-xl mb-4">{error}</div>
           <div className="text-gray-400 text-sm mb-6">
-            Make sure your browser has camera and microphone permissions enabled.
+            Make sure your browser has camera and microphone permissions
+            enabled.
           </div>
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate("/")}
             className="bg-cyan-500 text-black px-6 py-3 rounded-lg hover:bg-cyan-400 transition-colors"
           >
             Back to Home
@@ -277,14 +301,16 @@ export default function Call() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-white text-xl font-bold">
-              {user.uid === callData.callerId ? `Calling ${callData.calleeName}` : `Call from ${callData.callerName}`}
+              {user.uid === callData.callerId
+                ? `Calling ${callData.calleeName}`
+                : `Call from ${callData.callerName}`}
             </h1>
             <p className="text-cyan-400 text-sm">{connectionStatus}</p>
             <p className="text-gray-500 text-xs">
-              Role: {user.uid === callData.callerId ? 'Caller' : 'Callee'} | 
-              Offer: {callData.offer ? '✅' : '❌'} | 
-              Answer: {callData.answer ? '✅' : '❌'} |
-              Initialized: {isInitialized ? '✅' : '❌'}
+              Role: {user.uid === callData.callerId ? "Caller" : "Callee"} |
+              Offer: {callData.offer ? "✅" : "❌"} | Answer:{" "}
+              {callData.answer ? "✅" : "❌"} | Initialized:{" "}
+              {isInitialized ? "✅" : "❌"}
             </p>
           </div>
           <button
@@ -297,22 +323,47 @@ export default function Call() {
       </div>
 
       {/* Video Container */}
+      {/* Enhanced Video Container with debugging */}
       <div className="flex-1 relative p-4">
         <video
           ref={remoteVideoRef}
           autoPlay
           playsInline
+          controls={false}
+          muted={false}
           className="w-full h-full object-cover rounded-xl bg-gray-900"
-          style={{ maxHeight: 'calc(100vh - 200px)' }}
+          style={{ maxHeight: "calc(100vh - 200px)" }}
+          onLoadedMetadata={() =>
+            console.log("📺 Remote video metadata loaded")
+          }
+          onCanPlay={() => console.log("📺 Remote video can play")}
+          onPlaying={() => console.log("📺 Remote video is playing")}
         />
-        
+
         <video
           ref={localVideoRef}
           autoPlay
           muted
           playsInline
+          controls={false}
           className="absolute bottom-4 right-4 w-48 h-36 object-cover rounded-xl border-2 border-cyan-400 shadow-lg md:w-48 md:h-36 sm:w-32 sm:h-24"
+          onLoadedMetadata={() => console.log("📺 Local video metadata loaded")}
+          onCanPlay={() => console.log("📺 Local video can play")}
+          onPlaying={() => console.log("📺 Local video is playing")}
         />
+
+        {/* Debug info overlay */}
+        <div className="absolute top-4 left-4 bg-black/50 text-white text-xs p-2 rounded">
+          <div>
+            Local tracks:{" "}
+            {localVideoRef.current?.srcObject?.getTracks().length || 0}
+          </div>
+          <div>
+            Remote tracks:{" "}
+            {remoteVideoRef.current?.srcObject?.getTracks().length || 0}
+          </div>
+          <div>Connected: {isConnected ? "✅" : "❌"}</div>
+        </div>
 
         {!isConnected && !error && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
