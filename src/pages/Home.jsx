@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import { useState,useEffect } from "react";
 import { useAuth } from "../hooks/auth/useAuth";
 import Navbar from "../components/Navbar";
 import User from "../components/User";

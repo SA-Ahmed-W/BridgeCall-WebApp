@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { firestore } from "../db/firestore";
 import { useAuth } from "../hooks/auth/useAuth";
 import { useNavigate } from "react-router-dom";

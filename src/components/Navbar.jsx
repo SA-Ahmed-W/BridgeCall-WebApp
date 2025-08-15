@@ -6,7 +6,7 @@ import {firestore} from "../db/firestore";
 
 export default function Navbar() {
   const { user } = useAuth();
-  // Ensure user is defined before accessing properties
+  
 
   const handleLogout = async () => {
     try {

@@ -87,7 +87,7 @@ class Firestore {
     });
   }
 
-  // Removed addIceCandidate method - handling candidates directly in Call.jsx
+ 
 }
 
 export const firestore = new Firestore();

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import WebRTCService from "../webrtc/WebRTCService";
 import { firestore } from "../db/firestore";
 import { useAuth } from "../hooks/auth/useAuth";
