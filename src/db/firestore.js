@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, query,onSnapshot,collection} from 'firebase/firestore';
 
 class Firestore {
 
@@ -8,8 +8,9 @@ class Firestore {
       await setDoc(
         doc(db, 'users', uid),
         {
-          status: 'active',
+          status: 'online',
           createdAt: serverTimestamp(),
+          lastSeen: serverTimestamp(),
           ...data,
         },
         { merge: true }
@@ -33,6 +34,18 @@ class Firestore {
       console.error('Error updating user in Firestore:', err);
       throw err; // propagate to caller
     }
+  }
+
+  // Subscribe to users collection
+  subscribeToUsers(callback) {
+    const q = query(collection(db, 'users'));
+    return onSnapshot(q, (querySnapshot) => {
+      const users = [];
+      querySnapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+      callback(users);
+    });
   }
 }
 

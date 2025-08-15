@@ -10,7 +10,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // Optionally, you can update the user's status in Firestore before signing out
+      
       await firestore.updateUser(user.uid, { status: 'offline' });
       await signOut(auth);
     } catch (error) {

@@ -1,41 +1,76 @@
-import React from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import React, { useState } from 'react';
 import { useAuth } from '../hooks/auth/useAuth';
 import Navbar from '../components/Navbar';
+import User from '../components/User';
+import UserFilter from '../components/UserFilter';
 
 export default function Home() {
   const { user } = useAuth();
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <div className="min-h-screen bg-black">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-cyan-400/5 blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-blue-500/5 blur-3xl animate-pulse"></div>
+      </div>
+
       <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-black bg-opacity-20 backdrop-blur-md border border-white border-opacity-20 rounded-xl p-8 shadow-2xl max-w-2xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-6">Welcome Home!</h1>
-          <div className="space-y-4">
-            <p className="text-gray-300 text-lg">
-              Hello, <span className="text-[rgb(44,169,188)] font-semibold">{user?.displayName || 'User'}</span>!
-            </p>
-            <p className="text-gray-400">Email: {user?.email}</p>
-            <div className="pt-4">
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-300 transform hover:scale-105"
+      
+      <div className="relative container mx-auto px-4 py-8">
+        {/* Welcome Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">
+            Welcome, {user?.displayName || 'User'}!
+          </h1>
+          <p className="text-gray-400">Connect with users around the world</p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="max-w-md mx-auto">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search users by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl py-4 px-6 pl-12 
+                           text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 
+                           focus:border-cyan-400/50 transition-all duration-300"
+              />
+              <svg 
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
               >
-                Sign Out
-              </button>
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                />
+              </svg>
             </div>
           </div>
         </div>
+
+        {/* Filter Component */}
+        <div className="mb-8">
+          <UserFilter 
+            statusFilter={statusFilter} 
+            setStatusFilter={setStatusFilter} 
+          />
+        </div>
+
+        {/* Users List */}
+        <User 
+          statusFilter={statusFilter} 
+          searchTerm={searchTerm}
+        />
       </div>
     </div>
   );
