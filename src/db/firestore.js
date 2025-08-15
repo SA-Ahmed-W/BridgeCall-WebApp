@@ -2,7 +2,6 @@ import { db } from "../firebase";
 import {
   doc,
   setDoc,
-  arrayUnion,
   serverTimestamp,
   query,
   onSnapshot,
@@ -26,7 +25,7 @@ class Firestore {
       );
     } catch (err) {
       console.error("Error saving user to Firestore:", err);
-      throw err; // propagate to caller
+      throw err;
     }
   }
 
@@ -42,11 +41,10 @@ class Firestore {
       );
     } catch (err) {
       console.error("Error updating user in Firestore:", err);
-      throw err; // propagate to caller
+      throw err;
     }
   }
 
-  // Subscribe to users collection
   subscribeToUsers(callback) {
     const q = query(collection(db, "users"));
     return onSnapshot(q, (querySnapshot) => {
@@ -89,12 +87,7 @@ class Firestore {
     });
   }
 
-  async addIceCandidate(callId, candidate, type) {
-    const field = type === "offer" ? "offerCandidates" : "answerCandidates";
-    await updateDoc(doc(db, "calls", callId), {
-      [field]: arrayUnion(candidate),
-    });
-  }
+  // Removed addIceCandidate method - handling candidates directly in Call.jsx
 }
 
 export const firestore = new Firestore();

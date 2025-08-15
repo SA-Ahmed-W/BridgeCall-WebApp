@@ -1,3 +1,4 @@
+
 export default class WebRTCService {
   constructor() {
     this.peerConnection = null;
@@ -6,12 +7,10 @@ export default class WebRTCService {
     this.onIceCandidate = null;
   }
 
-  // Add mobile detection
   isMobile() {
     return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
 
-  // Enhanced mobile permissions handling
   async handleMobilePermissions() {
     try {
       const constraints = this.isMobile() 
@@ -37,7 +36,6 @@ export default class WebRTCService {
   }
 
   async init(localVideoEl, remoteVideoEl, config = {}) {
-    // Check permissions first
     const hasPermissions = await this.handleMobilePermissions();
     if (!hasPermissions) {
       throw new Error('Camera/microphone permissions denied');
@@ -48,7 +46,6 @@ export default class WebRTCService {
       ...config
     });
 
-    // Mobile-optimized constraints
     const constraints = this.isMobile() 
       ? { 
           video: { 
@@ -71,7 +68,6 @@ export default class WebRTCService {
 
       if (localVideoEl) localVideoEl.srcObject = this.localStream;
 
-      // Remote stream setup
       this.remoteStream = new MediaStream();
       this.peerConnection.addEventListener('track', (event) => {
         event.streams[0].getTracks().forEach(track => 
@@ -80,10 +76,17 @@ export default class WebRTCService {
         if (remoteVideoEl) remoteVideoEl.srcObject = this.remoteStream;
       });
 
-      // ICE candidates
+      // FIX: Properly serialize ICE candidates
       this.peerConnection.onicecandidate = (event) => {
         if (event.candidate && typeof this.onIceCandidate === "function") {
-          this.onIceCandidate(event.candidate);
+          // Convert ICE candidate to plain object
+          const candidateObject = {
+            candidate: event.candidate.candidate,
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            sdpMid: event.candidate.sdpMid,
+            usernameFragment: event.candidate.usernameFragment
+          };
+          this.onIceCandidate(candidateObject);
         }
       };
 
@@ -93,11 +96,14 @@ export default class WebRTCService {
     }
   }
 
-  // Rest of your existing methods...
   async createOffer() {
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
-    return offer;
+    // Return plain object, not RTCSessionDescription
+    return {
+      type: offer.type,
+      sdp: offer.sdp
+    };
   }
 
   async setRemoteDescription(desc) {
@@ -107,11 +113,19 @@ export default class WebRTCService {
   async createAnswer() {
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
-    return answer;
+    // Return plain object, not RTCSessionDescription
+    return {
+      type: answer.type,
+      sdp: answer.sdp
+    };
   }
 
   async addIceCandidate(candidate) {
-    await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    try {
+      await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (error) {
+      console.error('Error adding ICE candidate:', error);
+    }
   }
 
   async close() {

@@ -73,88 +73,85 @@ export default function Call() {
   }, [callId]);
 
   // WebRTC setup and signaling
-  useEffect(() => {
-    if (!callData || !user || error) return;
+useEffect(() => {
+  if (!callData || !user || error) return;
 
-    const startWebRTC = async () => {
-      try {
-        setConnectionStatus('Requesting camera/microphone access...');
-        
-        // Initialize WebRTC with mobile handling
-        await webrtc.init(localVideoRef.current, remoteVideoRef.current, {
-          iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
+  const startWebRTC = async () => {
+    try {
+      setConnectionStatus('Requesting camera/microphone access...');
+      
+      await webrtc.init(localVideoRef.current, remoteVideoRef.current, {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      setPermissionGranted(true);
+      setConnectionStatus('Setting up connection...');
+
+      // FIX: Handle ICE candidates properly
+      webrtc.onIceCandidate = async (candidateObject) => {
+        const field = user.uid === callData.callerId ? "offerCandidates" : "answerCandidates";
+        const currentCandidates = callData[field] || [];
+        await firestore.updateCall(callId, {
+          [field]: [...currentCandidates, candidateObject] // Already a plain object
         });
+      };
 
-        setPermissionGranted(true);
-        setConnectionStatus('Setting up connection...');
-
-        // Handle ICE candidates
-        webrtc.onIceCandidate = async (candidate) => {
-          const field = user.uid === callData.callerId ? "offerCandidates" : "answerCandidates";
-          const currentCandidates = callData[field] || [];
-          await firestore.updateCall(callId, {
-            [field]: [...currentCandidates, candidate.toJSON()]
+      if (user.uid === callData.callerId) {
+        // Caller flow
+        setConnectionStatus('Creating offer...');
+        if (!callData.offer) {
+          const offer = await webrtc.createOffer();
+          await firestore.updateCall(callId, { offer }); // Already a plain object
+          setConnectionStatus('Waiting for answer...');
+        }
+        
+        if (callData.answer) {
+          setConnectionStatus('Connecting...');
+          await webrtc.setRemoteDescription(callData.answer);
+          setIsConnected(true);
+          setConnectionStatus('Connected');
+        }
+      } else if (user.uid === callData.calleeId) {
+        // Callee flow
+        if (callData.offer && !callData.answer) {
+          setConnectionStatus('Answering call...');
+          await webrtc.setRemoteDescription(callData.offer);
+          const answer = await webrtc.createAnswer();
+          await firestore.updateCall(callId, { 
+            answer, // Already a plain object
+            status: 'connected' 
           });
-        };
-
-        if (user.uid === callData.callerId) {
-          // Caller flow
-          setConnectionStatus('Creating offer...');
-          if (!callData.offer) {
-            const offer = await webrtc.createOffer();
-            await firestore.updateCall(callId, { offer: offer.toJSON() });
-            setConnectionStatus('Waiting for answer...');
-          }
-          
-          if (callData.answer) {
-            setConnectionStatus('Connecting...');
-            await webrtc.setRemoteDescription(callData.answer);
-            setIsConnected(true);
-            setConnectionStatus('Connected');
-          }
-        } else if (user.uid === callData.calleeId) {
-          // Callee flow
-          if (callData.offer && !callData.answer) {
-            setConnectionStatus('Answering call...');
-            await webrtc.setRemoteDescription(callData.offer);
-            const answer = await webrtc.createAnswer();
-            await firestore.updateCall(callId, { 
-              answer: answer.toJSON(), 
-              status: 'connected' 
-            });
-            setIsConnected(true);
-            setConnectionStatus('Connected');
-          }
+          setIsConnected(true);
+          setConnectionStatus('Connected');
         }
-
-        // Add ICE candidates
-        const offerCandidates = callData.offerCandidates || [];
-        const answerCandidates = callData.answerCandidates || [];
-        
-        [...offerCandidates, ...answerCandidates].forEach(candidate => {
-          webrtc.addIceCandidate(candidate).catch(console.error);
-        });
-
-      } catch (err) {
-        console.error('WebRTC Error:', err);
-        
-        // Mobile-specific error handling
-        if (err.message.includes('permissions denied')) {
-          setError('Camera/microphone access denied. Please refresh and allow permissions.');
-        } else if (err.name === 'NotFoundError') {
-          setError('No camera or microphone found on your device.');
-        } else if (err.name === 'NotReadableError') {
-          setError('Camera/microphone is being used by another application.');
-        } else {
-          setError('Failed to establish connection: ' + err.message);
-        }
-        setConnectionStatus('Connection failed');
       }
-    };
 
-    startWebRTC();
-  }, [callData, user, callId, error]);
+      // Add ICE candidates
+      const offerCandidates = callData.offerCandidates || [];
+      const answerCandidates = callData.answerCandidates || [];
+      
+      [...offerCandidates, ...answerCandidates].forEach(candidate => {
+        webrtc.addIceCandidate(candidate).catch(console.error);
+      });
 
+    } catch (err) {
+      console.error('WebRTC Error:', err);
+      
+      if (err.message.includes('permissions denied')) {
+        setError('Camera/microphone access denied. Please refresh and allow permissions.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera or microphone found on your device.');
+      } else if (err.name === 'NotReadableError') {
+        setError('Camera/microphone is being used by another application.');
+      } else {
+        setError('Failed to establish connection: ' + err.message);
+      }
+      setConnectionStatus('Connection failed');
+    }
+  };
+
+  startWebRTC();
+}, [callData, user, callId, error]);
   // Cleanup on unmount
   useEffect(() => {
     return () => {
