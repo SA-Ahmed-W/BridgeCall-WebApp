@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import WebRTCService from '../webrtc/WebRTCService';
 import { firestore } from '../db/firestore';
@@ -20,7 +21,10 @@ export default function Call() {
   // Listen for call doc changes
   useEffect(() => {
     if (!callId) return;
+    console.log('🔄 Setting up call listener for:', callId);
+    
     const unsubscribe = firestore.listenToCall(callId, (data) => {
+      console.log('📞 Call data updated:', data);
       setCallData(data);
       if (data?.status === 'ended') {
         endCall();
@@ -31,11 +35,27 @@ export default function Call() {
 
   // WebRTC setup and signaling with proper sequencing
   useEffect(() => {
-    if (!callData || !user || error || isInitialized) return;
+    if (!callData || !user) {
+      console.log('⏳ Waiting for callData and user...', { callData: !!callData, user: !!user });
+      return;
+    }
+    if (error) {
+      console.log('❌ Skipping due to error:', error);
+      return;
+    }
+    if (isInitialized) {
+      console.log('✅ Already initialized, skipping...');
+      return;
+    }
+
+    console.log('🚀 Starting WebRTC setup...');
+    console.log('👤 User role:', user.uid === callData.callerId ? 'CALLER' : 'CALLEE');
+    console.log('📋 Call data:', callData);
 
     const startWebRTC = async () => {
       try {
         setConnectionStatus('Requesting camera/microphone access...');
+        console.log('🎥 Initializing WebRTC...');
         
         // Initialize WebRTC
         await webrtc.init(localVideoRef.current, remoteVideoRef.current, {
@@ -43,12 +63,15 @@ export default function Call() {
         });
 
         setIsInitialized(true);
+        console.log('✅ WebRTC initialized successfully');
         setConnectionStatus('Setting up connection...');
 
         // Handle ICE candidates
         webrtc.onIceCandidate = async (candidateObject) => {
           const field = user.uid === callData.callerId ? "offerCandidates" : "answerCandidates";
           const currentCandidates = callData[field] || [];
+          console.log(`🧊 Adding ICE candidate to ${field}:`, candidateObject);
+          
           await firestore.updateCall(callId, {
             [field]: [...currentCandidates, candidateObject]
           });
@@ -56,17 +79,25 @@ export default function Call() {
 
         // CALLER FLOW
         if (user.uid === callData.callerId) {
+          console.log('📤 CALLER: Starting caller flow...');
           setConnectionStatus('Creating offer...');
           
           // Create offer if not exists
           if (!callData.offer) {
+            console.log('📝 CALLER: Creating offer...');
             const offer = await webrtc.createOffer();
+            console.log('📝 CALLER: Offer created:', offer);
+            
             await firestore.updateCall(callId, { offer });
+            console.log('💾 CALLER: Offer saved to Firestore');
             setConnectionStatus('Waiting for answer...');
+          } else {
+            console.log('📝 CALLER: Offer already exists:', callData.offer);
           }
           
           // Handle answer when available
           if (callData.answer) {
+            console.log('📥 CALLER: Answer received, processing...');
             setConnectionStatus('Processing answer...');
             await webrtc.setRemoteDescription(callData.answer);
             setIsConnected(true);
@@ -74,40 +105,56 @@ export default function Call() {
             
             // Add ICE candidates after remote description is set
             const answerCandidates = callData.answerCandidates || [];
+            console.log('🧊 CALLER: Adding answer candidates:', answerCandidates.length);
             answerCandidates.forEach(candidate => {
               webrtc.addIceCandidate(candidate);
             });
+          } else {
+            console.log('⏳ CALLER: Waiting for answer...');
           }
         } 
         // CALLEE FLOW
         else if (user.uid === callData.calleeId) {
+          console.log('📥 CALLEE: Starting callee flow...');
+          
           if (callData.offer && !callData.answer) {
+            console.log('📝 CALLEE: Offer received, processing...');
             setConnectionStatus('Processing offer...');
             
             // Set remote description first
             await webrtc.setRemoteDescription(callData.offer);
+            console.log('✅ CALLEE: Remote description set');
             
             // Add offer candidates after remote description is set
             const offerCandidates = callData.offerCandidates || [];
+            console.log('🧊 CALLEE: Adding offer candidates:', offerCandidates.length);
             offerCandidates.forEach(candidate => {
               webrtc.addIceCandidate(candidate);
             });
             
             // Create and send answer
             setConnectionStatus('Creating answer...');
+            console.log('📝 CALLEE: Creating answer...');
             const answer = await webrtc.createAnswer();
+            console.log('📝 CALLEE: Answer created:', answer);
+            
             await firestore.updateCall(callId, { 
               answer, 
               status: 'connected' 
             });
+            console.log('💾 CALLEE: Answer saved to Firestore');
             
             setIsConnected(true);
             setConnectionStatus('Connected');
+          } else {
+            console.log('⏳ CALLEE: Waiting for offer or answer already exists');
+            console.log('📋 CALLEE: offer exists:', !!callData.offer);
+            console.log('📋 CALLEE: answer exists:', !!callData.answer);
           }
         }
 
       } catch (err) {
-        console.error('WebRTC Error:', err);
+        console.error('❌ WebRTC Error:', err);
         
         if (err.message.includes('permissions denied')) {
           setError('Camera/microphone access denied. Please refresh and allow permissions.');
@@ -125,10 +172,34 @@ export default function Call() {
     startWebRTC();
   }, [callData, user, callId, error, isInitialized]);
 
-  // Handle dynamic ICE candidates (after initial setup)
+  // Handle dynamic ICE candidates and call updates
   useEffect(() => {
     if (!callData || !isInitialized || !webrtc.peerConnection) return;
 
+    console.log('🔄 Processing call updates...');
+
+    // CALLER: Check for new answer
+    if (user.uid === callData.callerId && callData.answer && !isConnected) {
+      console.log('📥 CALLER: New answer detected, processing...');
+      (async () => {
+        try {
+          setConnectionStatus('Processing answer...');
+          await webrtc.setRemoteDescription(callData.answer);
+          setIsConnected(true);
+          setConnectionStatus('Connected');
+          
+          // Add answer candidates
+          const answerCandidates = callData.answerCandidates || [];
+          answerCandidates.forEach(candidate => {
+            webrtc.addIceCandidate(candidate);
+          });
+        } catch (err) {
+          console.error('❌ Error processing answer:', err);
+        }
+      })();
+    }
+
+    // Process new ICE candidates
     const handleNewCandidates = () => {
       if (user.uid === callData.callerId) {
         // Caller processes answer candidates
@@ -146,11 +217,12 @@ export default function Call() {
     };
 
     handleNewCandidates();
-  }, [callData?.offerCandidates, callData?.answerCandidates, isInitialized]);
+  }, [callData?.offer, callData?.answer, callData?.offerCandidates, callData?.answerCandidates, isInitialized]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🧹 Cleaning up WebRTC...');
       webrtc.close();
     };
   }, []);
@@ -158,6 +230,7 @@ export default function Call() {
   // End call function
   const endCall = async () => {
     try {
+      console.log('📞 Ending call...');
       await webrtc.close();
       if (callData && callData.status !== 'ended') {
         await firestore.updateCall(callId, { status: 'ended' });
@@ -207,6 +280,12 @@ export default function Call() {
               {user.uid === callData.callerId ? `Calling ${callData.calleeName}` : `Call from ${callData.callerName}`}
             </h1>
             <p className="text-cyan-400 text-sm">{connectionStatus}</p>
+            <p className="text-gray-500 text-xs">
+              Role: {user.uid === callData.callerId ? 'Caller' : 'Callee'} | 
+              Offer: {callData.offer ? '✅' : '❌'} | 
+              Answer: {callData.answer ? '✅' : '❌'} |
+              Initialized: {isInitialized ? '✅' : '❌'}
+            </p>
           </div>
           <button
             onClick={endCall}
