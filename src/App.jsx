@@ -1,42 +1,31 @@
-import { useEffect, useState } from 'react';
-import { db } from "./firebase";
-import { collection, getDocs } from "firebase/firestore";
-
-
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './hooks/auth/useAuth';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Home from './pages/Home';
 
 function App() {
-  const [docs, setDocs] = useState([]);
-
-  useEffect(() => {
-    async function fetchData() {
-      const querySnapshot = await getDocs(collection(db, "test"));
-      if (querySnapshot.empty) {
-        console.log("No documents found in the 'test' collection.");
-        return;
-      }
-      const docsData = [];
-      querySnapshot.forEach(doc => {
-        docsData.push({ id: doc.id, ...doc.data() });
-      });
-  
-      setDocs(docsData);
-    }
-    fetchData();
-  }, []);
-
   return (
-    <div>
-      <h2 className='underline'>Test Collection</h2>
-      <ul>
-        {docs.map(doc => (
-          <li key={doc.id}>
-            <div>
-              <strong>{doc.id}</strong>: {JSON.stringify(doc)}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 
