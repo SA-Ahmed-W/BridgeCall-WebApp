@@ -1,10 +1,10 @@
-
 export default class WebRTCService {
   constructor() {
     this.peerConnection = null;
     this.localStream = null;
     this.remoteStream = null;
     this.onIceCandidate = null;
+    this.pendingCandidates = []; // Queue for ICE candidates
   }
 
   isMobile() {
@@ -76,10 +76,9 @@ export default class WebRTCService {
         if (remoteVideoEl) remoteVideoEl.srcObject = this.remoteStream;
       });
 
-      // FIX: Properly serialize ICE candidates
+      // Handle ICE candidates safely
       this.peerConnection.onicecandidate = (event) => {
         if (event.candidate && typeof this.onIceCandidate === "function") {
-          // Convert ICE candidate to plain object
           const candidateObject = {
             candidate: event.candidate.candidate,
             sdpMLineIndex: event.candidate.sdpMLineIndex,
@@ -90,6 +89,16 @@ export default class WebRTCService {
         }
       };
 
+      // Process pending candidates when remote description is set
+      this.peerConnection.addEventListener('signalingstatechange', () => {
+        if (this.peerConnection.remoteDescription && this.pendingCandidates.length > 0) {
+          this.pendingCandidates.forEach(candidate => {
+            this.addIceCandidate(candidate);
+          });
+          this.pendingCandidates = [];
+        }
+      });
+
     } catch (error) {
       console.error('WebRTC initialization failed:', error);
       throw error;
@@ -99,7 +108,6 @@ export default class WebRTCService {
   async createOffer() {
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
-    // Return plain object, not RTCSessionDescription
     return {
       type: offer.type,
       sdp: offer.sdp
@@ -107,13 +115,19 @@ export default class WebRTCService {
   }
 
   async setRemoteDescription(desc) {
-    await this.peerConnection.setRemoteDescription(new RTCSessionDescription(desc));
+    try {
+      console.log('Setting remote description, current state:', this.peerConnection.signalingState);
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(desc));
+      console.log('Remote description set successfully, new state:', this.peerConnection.signalingState);
+    } catch (error) {
+      console.error('Failed to set remote description:', error);
+      throw error;
+    }
   }
 
   async createAnswer() {
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
-    // Return plain object, not RTCSessionDescription
     return {
       type: answer.type,
       sdp: answer.sdp
@@ -122,9 +136,16 @@ export default class WebRTCService {
 
   async addIceCandidate(candidate) {
     try {
+      if (!this.peerConnection.remoteDescription) {
+        console.log('Remote description not set yet, queuing candidate');
+        this.pendingCandidates.push(candidate);
+        return;
+      }
+      
       await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      console.log('ICE candidate added successfully');
     } catch (error) {
-      console.error('Error adding ICE candidate:', error);
+      console.warn('Error adding ICE candidate (ignoring):', error);
     }
   }
 
@@ -136,5 +157,6 @@ export default class WebRTCService {
     this.peerConnection = null;
     this.localStream = null;
     this.remoteStream = null;
+    this.pendingCandidates = [];
   }
 }
