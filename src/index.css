@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+/* Add to your CSS for mobile optimization */
+@media (max-width: 768px) {
+  .video-container {
+    flex-direction: column;
+  }
+  
+  .local-video {
+    position: relative;
+    width: 100%;
+    margin-top: 1rem;
+  }
+}
