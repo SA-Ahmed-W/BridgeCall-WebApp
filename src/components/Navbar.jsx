@@ -2,12 +2,16 @@ import React from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../hooks/auth/useAuth';
+import {firestore} from "../db/firestore"; 
 
 export default function Navbar() {
   const { user } = useAuth();
+  // Ensure user is defined before accessing properties
 
   const handleLogout = async () => {
     try {
+      // Optionally, you can update the user's status in Firestore before signing out
+      await firestore.updateUser(user.uid, { status: 'offline' });
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);

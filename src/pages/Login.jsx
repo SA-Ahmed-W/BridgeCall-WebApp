@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/auth/useAuth";
+import {firestore} from "../db/firestore"
 
 export default function Login() {
   // Local form state
@@ -41,6 +42,8 @@ export default function Login() {
 
     try {
       await login(email, password);
+      // Optionally update user status in Firestore
+      await firestore.updateUser(user.uid, { status: 'online' });
       // Optionally persist email for “remember me”
       if (rememberMe) localStorage.setItem("rememberEmail", email);
       else localStorage.removeItem("rememberEmail");

@@ -1,29 +1,35 @@
-// src/pages/Register.jsx
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/auth/useAuth';
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/auth/useAuth";
+import { firestore } from "../db/firestore";
 
 export default function Register() {
   // Form state
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirm: '',
+    name: "",
+    email: "",
+    password: "",
+    confirm: "",
   });
-  const [localError, setLocalError] = useState('');
-  
+  const [localError, setLocalError] = useState("");
+
   // Focus states for password fields
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused] = useState(false);
 
   // Auth context
-  const { user, register, loading: authLoading, error: authError, clearError } = useAuth();
+  const {
+    user,
+    register,
+    loading: authLoading,
+    error: authError,
+    clearError,
+  } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
+    if (user) navigate("/", { replace: true });
   }, [user, navigate]);
 
   // Handle form field updates
@@ -33,7 +39,7 @@ export default function Register() {
   // Submit handler
   async function handleSubmit(e) {
     e.preventDefault();
-    setLocalError('');
+    setLocalError("");
     clearError();
 
     const { name, email, password, confirm } = form;
@@ -42,16 +48,31 @@ export default function Register() {
       return setLocalError("Passwords don't match");
     }
     if (password.length < 6) {
-      return setLocalError('Password should be at least 6 characters');
+      return setLocalError("Password should be at least 6 characters");
     }
 
     try {
-      await register(email, password, name);
-      navigate('/', { replace: true });
+      const { user: fbUser } = await register(email, password, name);
+
+      // Persist extra profile fields in Firestore
+      await firestore.saveUser(fbUser.uid, {
+        uid: fbUser.uid,
+        displayName: name,
+        email,
+      });
+
+      navigate("/", { replace: true });
     } catch {
       /* error handled in hook */
     }
   }
+
+  // Clear local error when auth error changes
+  useEffect(() => {
+    if (authError) {
+      setLocalError(authError);
+    }
+  }, [authError]);
 
   const displayError = localError || authError;
 
@@ -66,12 +87,8 @@ export default function Register() {
       <div className="max-w-md w-full space-y-8 relative">
         {/* Logo and Title */}
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-white">
-            Create Account
-          </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Sign up to get started
-          </p>
+          <h2 className="mt-6 text-3xl font-bold text-white">Create Account</h2>
+          <p className="mt-2 text-sm text-gray-400">Sign up to get started</p>
         </div>
 
         {/* Register Form */}
@@ -85,7 +102,10 @@ export default function Register() {
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Full Name
               </label>
               <input
@@ -103,7 +123,10 @@ export default function Register() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Email address
               </label>
               <input
@@ -121,7 +144,10 @@ export default function Register() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Password
               </label>
               <input
@@ -141,7 +167,10 @@ export default function Register() {
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirm" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="confirm"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Confirm Password
               </label>
               <input
@@ -168,7 +197,7 @@ export default function Register() {
               {authLoading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                'Create Account'
+                "Create Account"
               )}
             </button>
           </form>
@@ -180,7 +209,9 @@ export default function Register() {
                 <div className="w-full border-t border-white/10" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-transparent text-gray-400">Already have an account?</span>
+                <span className="px-2 bg-transparent text-gray-400">
+                  Already have an account?
+                </span>
               </div>
             </div>
 
