@@ -96,6 +96,7 @@ export default function Call() {
           iceCandidatePoolSize: 10,
           bundlePolicy: "max-bundle",
           rtcpMuxPolicy: "require",
+          iceTransportPolicy: 'all'
         });
 
         setIsInitialized(true);

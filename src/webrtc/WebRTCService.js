@@ -162,10 +162,23 @@ export default class WebRTCService {
       });
 
       this.peerConnection.addEventListener("iceconnectionstatechange", () => {
-        console.log(
-          "🧊 ICE connection state:",
-          this.peerConnection.iceConnectionState
-        );
+        if (this.peerConnection) {
+          const state = this.peerConnection.iceConnectionState;
+          console.log("🧊 ICE connection state:", state);
+
+          // Add ICE restart for failed connections
+          if (state === "failed") {
+            console.log("🔄 ICE failed, restarting...");
+            setTimeout(() => {
+              if (
+                this.peerConnection &&
+                this.peerConnection.iceConnectionState === "failed"
+              ) {
+                this.peerConnection.restartIce();
+              }
+            }, 1000);
+          }
+        }
       });
 
       // Handle ICE candidates safely
