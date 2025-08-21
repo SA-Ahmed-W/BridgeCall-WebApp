@@ -65,34 +65,30 @@ export default function Call() {
         // Initialize WebRTC
         await webrtc.init(localVideoRef.current, remoteVideoRef.current, {
           iceServers: [
-            // STUN servers for NAT discovery
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-
-            // OpenRelay (Free, no registration needed)
-            {
-              urls: "turn:openrelay.metered.ca:80",
-              username: "openrelayproject",
-              credential: "openrelayproject",
-            },
-            {
-              urls: "turn:openrelay.metered.ca:443",
-              username: "openrelayproject",
-              credential: "openrelayproject",
-            },
-
-            // Backup TURN servers
-            {
-              urls: "turn:a.relay.metered.ca:80",
-              username: "a5fb4bf4e9ba7a5dd73c",
-              credential: "gKUOWzJY8aV7TKwU",
-            },
-            {
-              urls: "turn:relay1.expressturn.com:3478",
-              username: "ef2Q2NS4JXMCF1S1H4",
-              credential: "RTnI4y1fKOvIlnhb",
-            },
-          ],
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "54646a3f25b33106d83ca2fb",
+        credential: "SZTXly1SIJT7t9W9",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "54646a3f25b33106d83ca2fb",
+        credential: "SZTXly1SIJT7t9W9",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "54646a3f25b33106d83ca2fb",
+        credential: "SZTXly1SIJT7t9W9",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "54646a3f25b33106d83ca2fb",
+        credential: "SZTXly1SIJT7t9W9",
+      },
+  ],
           iceCandidatePoolSize: 10,
           bundlePolicy: "max-bundle",
           rtcpMuxPolicy: "require",
